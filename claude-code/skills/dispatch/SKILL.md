@@ -50,16 +50,37 @@ description: 派活手册（Opus 主脑模式）。主会话是 Opus 5.5、要�
 
 ```text
 # 单任务，用当前工作区
-orca orchestration worker-start --spec-file <任务说明.md> --task-title "<标题>" --worktree current --agent claude --model group/glm-fast
+orca orchestration worker-start --spec-file <任务说明.md> --task-title "<标题>" --worktree current --agent claude --model group/glm-fast --effort <档位> --keep-open
 
 # 并行改代码：每个 worker 独立 worktree（仅 git 仓库），并行上限 3
-orca orchestration worker-start --spec-file <说明.md> --worktree new-child --name <短名> --agent claude --model group/glm-main
+orca orchestration worker-start --spec-file <说明.md> --task-title "<标题>" --worktree new-child --name <短名> --agent claude --model group/glm-main --effort <档位> --keep-open
 
 # Codex 当 worker（模型 id 写法尚未验证，验证后再用）
 orca orchestration worker-start --spec-file <说明.md> --worktree current --agent codex --model <待验证>
 ```
 
 启动后**结束本轮**，Orca 会唤醒你；按唤醒提示跑 `check`，用 `send` 追加指令，不轮询。
+
+### 推理档位（每次派 worker 由主脑判断，必须带 `--effort`）
+
+`--effort` 要和 `--model` 一起用（2026-11-04 实测：`--effort low` 落到 magpie 记录里就是 low）。按任务难度选：
+
+- `low`：机械活——按明确清单改文案、重命名、批量替换、跑一遍给定命令收集输出。
+- `high`：常规实现——范围清楚的功能、补测试、修有复现步骤的 bug。拿不准时默认它。
+- `max`：难活——跨模块改动、并发/安全/数据迁移、没有复现步骤的 bug、上一次返工过的任务。
+
+GLM 和 DeepSeek 只有 low / high / max 三档；MiniMax 有 low / medium / high / xhigh / max，但不得低于 medium。派活回复里写一句"选了什么档位、为什么"。
+
+原生子代理的推理档位固定写在 agent 文件里，派的时候**不要传 `effort` 参数**：实测给 explorer 传 max、给 reviewer 传 low，magpie 记录都变成了 high，既不按传的走，还把 explorer 原本的 medium 冲掉了。
+
+### 让用户看得到、确认后再关
+
+- 每个 worker 都加 `--keep-open`：它在 Orca 对应工作区里开一个可见的 Claude Code 终端，用户随时能切过去看、能直接插话；干完也不自动关。
+- `--task-title` 写成用户一眼能认出的中文标题。它就是 Orca 会话管理里这条会话的标题，以后靠它找回。
+- 启动后告诉用户：在哪个工作区、标题是什么。
+- 收到 `worker_done` 后先按第 6 节验收；**验收通过后**再关终端：`orca orchestration worker-release --dispatch <dispatch_id>`。验收不通过就别关，用 `send` 把修正意见发回去。
+- 关掉只是释放终端，会话记录还在：用户可以在 Orca 的会话管理里按标题找到再打开；命令行用 `orca search "<标题关键词>" --scope all --sort newest` 也能搜到。需要它接着干活，用 `send` 发消息会把已关闭的 worker 重新唤起。
+- 汇报时写清：哪些 worker 已关闭、标题分别是什么。
 非 git 的文件夹工作区用 CLI 登记不进 Orca，只能在当前工作区起 worker，在说明里写清目标目录。
 
 ## 5. 任务说明（spec）怎么写
