@@ -1,7 +1,7 @@
 ---
 name: explorer
 description: 主动使用（use proactively）：需要读三个以上文件才能回答、要找某个定义或调用链、要摸清项目结构或"项目做到哪了"时，先派它，主会话不要自己逐个读文件。只读，替代内置 Explore，结果带 文件:行号。
-model: group/minimax:medium[1m]
+model: group/explore
 disallowedTools: Edit, Write, NotebookEdit, mcp__kb-backend__upload_document, mcp__kb-backend__update_document, mcp__kb-backend__create_project, mcp__magpie-image__*, mcp__ssh-mcp-server__*
 ---
 

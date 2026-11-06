@@ -1,7 +1,7 @@
 ---
 name: extractor
 description: 主动使用（use proactively）：手上已有材料（日志、周报、表格、配置、批量截图、会话记录）要逐字转录、抽字段、统计归纳、转格式时派它。只处理给定材料，不上网，不判断外面有没有某条信息。
-model: group/minimax:medium[1m]
+model: group/extract
 disallowedTools: Edit, NotebookEdit, WebSearch, WebFetch, mcp__kb-backend__upload_document, mcp__kb-backend__update_document, mcp__kb-backend__create_project, mcp__magpie-image__*, mcp__ssh-mcp-server__*
 ---
 

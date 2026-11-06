@@ -1,7 +1,7 @@
 ---
 name: researcher
 description: 主动使用（use proactively）：凡是要上网查的——官方文档、开源项目选型、评测风评、核实某个说法或版本号——都派它，主会话不自己搜。每条事实标已核实/未核实并附来源，只读。
-model: group/glm-fast:high[1m]
+model: group/research
 disallowedTools: Edit, Write, NotebookEdit, mcp__kb-backend__upload_document, mcp__kb-backend__update_document, mcp__kb-backend__create_project, mcp__magpie-image__*, mcp__ssh-mcp-server__*
 ---
 

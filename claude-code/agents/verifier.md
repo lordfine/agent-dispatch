@@ -1,7 +1,7 @@
 ---
 name: verifier
-description: 复核员（Opus，按次计费贵）。不主动使用：只在用户点名，或遇到架构/选型等关键决策复核、高风险改动上线前最终验收、两个执行者结论冲突需要裁决时才派。
-model: group/opus[1m]
+description: 复核员（用当前组合里最强的模型，贵）。不主动使用：只在明确指定，或遇到架构/选型等关键决策复核、高风险改动上线前最终验收、两个执行者结论冲突需要裁决时才派。
+model: group/verify
 disallowedTools: Edit, Write, NotebookEdit, mcp__kb-backend__upload_document, mcp__kb-backend__update_document, mcp__kb-backend__create_project, mcp__magpie-image__*, mcp__ssh-mcp-server__*
 ---
 

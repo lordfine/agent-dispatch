@@ -1,7 +1,7 @@
 ---
 name: writer
 description: 主动使用（use proactively）：结论已定、要写成文档时派它——交接文档、进度或项目文档更新、员工使用指南、运维速查、JD、报告初稿。只写指定路径，写完交回验收，不对外发送。
-model: group/ds-flash:high[1m]
+model: group/write
 disallowedTools: NotebookEdit, mcp__kb-backend__upload_document, mcp__kb-backend__update_document, mcp__kb-backend__create_project, mcp__magpie-image__*, mcp__ssh-mcp-server__*
 ---
 

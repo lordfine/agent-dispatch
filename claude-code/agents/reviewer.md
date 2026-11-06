@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: 主动使用（use proactively）：代码改动或 worker 交付完成后、方案定稿前，立即派它审查；安全轴和正确性轴可分两次派。只读，可跑测试取证，每条问题带 文件:行号 和触发条件。
-model: group/glm-fast:high[1m]
+model: group/review
 disallowedTools: Edit, Write, NotebookEdit, mcp__kb-backend__upload_document, mcp__kb-backend__update_document, mcp__kb-backend__create_project, mcp__magpie-image__*, mcp__ssh-mcp-server__*
 ---
 

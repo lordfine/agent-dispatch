@@ -1,7 +1,7 @@
 ---
 name: diagnoser
 description: 主动使用（use proactively）：遇到报错、服务异常（503/429/断流）、客户端卡死、网络或磁盘问题、远程服务器故障时，先派它取证，再讨论修法。只读，先确认目标机器，给假设、验证命令和回滚方案，不动手修。
-model: group/glm-fast:high[1m]
+model: group/diagnose
 disallowedTools: Edit, Write, NotebookEdit, mcp__kb-backend__upload_document, mcp__kb-backend__update_document, mcp__kb-backend__create_project, mcp__magpie-image__*, mcp__ssh-mcp-server__upload
 ---
 
