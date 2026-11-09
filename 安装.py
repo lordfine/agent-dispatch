@@ -9,7 +9,7 @@
 
 只动框架文件：~/.claude/skills/ 下的 dispatch、dispatch-retro、dispatch-feedback 三个目录，
 ~/.claude/agents/ 下的 7 个 agent。被替换的旧文件先备份到 ~/.claude/备份/<时间>-安装前/。
-个人配置 ~/.claude/派活配置/ 和 ~/.claude/CLAUDE.md 不碰；装完新开会话说「初始化派活」，按引导生成个人配置。
+个人配置 ~/.claude/派活配置/ 和 ~/.claude/CLAUDE.md 不碰；装完新开会话输入 /dispatch-retro，按引导生成个人配置。
 """
 import argparse
 import filecmp
@@ -126,9 +126,9 @@ def main():
     else:
         print(f"完成。被替换的旧文件在 {装.备份根}")
     if 个人配置.is_dir():
-        print(f"个人配置 {个人配置} 已存在，没动它。升级后可以说「复盘」看看要不要调整。")
+        print(f"个人配置 {个人配置} 已存在，没动它。升级后可以输入 /dispatch-retro 复盘，看看要不要调整。")
     else:
-        print("下一步：新开一个 Claude Code 会话，说「初始化派活」（或输入 /dispatch-retro），按引导生成个人配置。")
+        print("下一步：新开一个 Claude Code 会话，输入 /dispatch-retro，按引导生成个人配置。")
     print(f"全局规则片段在 {仓库 / 'CLAUDE.md片段.md'}，初始化引导会问你要不要加进 ~/.claude/CLAUDE.md。")
 
 
