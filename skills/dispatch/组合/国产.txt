@@ -1,0 +1,24 @@
+# 国产组合：Opus 主脑 + GLM / MiniMax / DeepSeek 干活
+# 这是示例组合：先用 magpie providers 查到自己的来源 id，把 <Codex来源>、<国产来源>、<Claude来源> 换掉，复制到个人配置的 组合/ 下再改。
+# 每行一条 magpie 命令；# 开头是注释。用 切换组合.py 应用。
+# 成员写法：供应商/模型[:推理档位][:fast]。写了档位就压过 agent 文件和调用方传的档位；
+# 档位一律限制在 medium 到 xhigh 之间。GLM 和 DeepSeek 只有 low/high/max，所以落到 GLM/DeepSeek 上一律钉 high。
+# impl、impl-strong 在 Codex 组合里写成 :medium+high+xhigh，由 --effort 在这三档里选。
+# impl-lite 在国产组合里和 impl 相同，只为了切组合后规格里写的组名还能用。
+magpie group add explore models=<国产来源>/MiniMax-M3.1-Flash:medium routing=order
+magpie group add extract models=<国产来源>/MiniMax-M3.1-Flash:medium routing=order
+magpie group add research models=<国产来源>/glm-5.3-flash:high routing=order
+magpie group add review models=<国产来源>/glm-5.3-flash:high routing=order
+magpie group add diagnose models=<国产来源>/glm-5.3-flash:high routing=order
+magpie group add write models=<国产来源>/deepseek-flash:high routing=order
+magpie group add verify models=<Claude来源>/claude-opus-5-5:high routing=order
+magpie group add impl-lite models=<国产来源>/glm-5.3-flash:high routing=order levels=medium,high,xhigh
+magpie group add impl models=<国产来源>/glm-5.3-flash:high routing=order levels=medium,high,xhigh
+magpie group add impl-strong models=<国产来源>/glm-5.3:high routing=order levels=medium,high,xhigh
+# Claude Code 的别名档位指回国产档位组，大小顺序和 Codex 组合一致：fable、opus 用 glm-main，sonnet、subagent 用 glm-fast，haiku 用 MiniMax。
+magpie claude fable group/glm-main[1m]
+magpie claude opus group/glm-main[1m]
+magpie claude sonnet group/glm-fast[1m]
+magpie claude subagent group/glm-fast[1m]
+# haiku 档位直接指向 MiniMax，不经组
+magpie claude haiku <国产来源>/MiniMax-M3.1-Flash

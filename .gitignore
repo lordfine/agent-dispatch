@@ -3,3 +3,6 @@ _素材/
 .DS_Store
 Thumbs.db
 当前组合.txt
+__pycache__/
+*.pyc
+本机/

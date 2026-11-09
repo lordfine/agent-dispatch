@@ -1,0 +1,29 @@
+# Codex 组合：Opus 主脑 + Codex 三个模型干活（全部开 fast，大部分组的第二顺位是另一个 Codex 模型；explore、extract 兜底是 MiniMax，write 兜底是 DeepSeek）
+# 这是示例组合：先用 magpie providers 查到自己的来源 id，把 <Codex来源>、<国产来源>、<Claude来源> 换掉，复制到个人配置的 组合/ 下再改。
+# 每行一条 magpie 命令；# 开头是注释。用 切换组合.py 应用。
+# Codex 额度用完或账号不可用时，routing=order 会自动顺延到第二个成员。
+# 额度紧张时的降级办法：把 Astra 换成 Sol、Sol 换成 Terra，或把 :xhigh 改 :high、:high 改 :medium。
+# stays=turn：每轮新对话都从第一顺位 Codex 重新试，避免一次断网后长会话一直留在兜底模型（2026-11-06 实测 stays=auto 时约七成请求滞留 GLM）。
+magpie group add explore models=<Codex来源>/gpt-6.1-terra:medium:fast,<国产来源>/MiniMax-M3.1-Flash:medium routing=order stays=turn
+magpie group add extract models=<Codex来源>/gpt-6.1-terra:medium:fast,<国产来源>/MiniMax-M3.1-Flash:medium routing=order stays=turn
+magpie group add research models=<Codex来源>/gpt-6.1-sol:high:fast,<Codex来源>/gpt-6-astra:high:fast routing=order stays=turn
+magpie group add review models=<Codex来源>/gpt-6.1-sol:xhigh:fast,<Codex来源>/gpt-6-astra:xhigh:fast routing=order stays=turn
+magpie group add diagnose models=<Codex来源>/gpt-6.1-sol:high:fast,<Codex来源>/gpt-6-astra:high:fast routing=order stays=turn
+magpie group add write models=<Codex来源>/gpt-6.1-terra:high:fast,<国产来源>/deepseek-flash:high routing=order stays=turn
+magpie group add verify models=<Codex来源>/gpt-6-astra:high:fast,<Codex来源>/gpt-6.1-sol:xhigh:fast routing=order stays=turn
+magpie group add impl-lite models=<Codex来源>/gpt-6.1-terra:medium+high+xhigh:fast,<Codex来源>/gpt-6.1-sol:medium+high+xhigh:fast routing=order stays=turn levels=medium,high,xhigh
+magpie group add impl models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh:fast,<Codex来源>/gpt-6.1-terra:medium+high+xhigh:fast routing=order stays=turn levels=medium,high,xhigh
+magpie group add impl-strong models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh:fast,<Codex来源>/gpt-6-astra:medium+high+xhigh:fast routing=order stays=turn levels=medium,high,xhigh
+# Claude Code 的别名档位按大小排：fable 最大，opus 其次，sonnet 再次，haiku 最小。
+# fable：复杂票、非标准任务、前端设计。opus：普通实现，只在主模型不是 Opus 的会话里生效（Opus 主会话传 opus 会直接用 Opus 本身）。
+# sonnet：确定性的清单活、claude-handoff。subagent：没写 model 的子代理（如 general-purpose）的默认落点。
+magpie claude fable group/impl-strong
+magpie claude fable_effort xhigh
+magpie claude opus group/impl
+magpie claude opus_effort high
+magpie claude sonnet group/impl-lite
+magpie claude sonnet_effort medium
+magpie claude subagent group/impl-lite
+magpie claude subagent_effort medium
+# haiku 档位直接指向 MiniMax，不经组。Claude Code 自己生成标题、摘要等后台小活也走 haiku，不能指向 Codex，否则会挤占 Codex 每分钟请求名额。
+magpie claude haiku <国产来源>/MiniMax-M3.1-Flash

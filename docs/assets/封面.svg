@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" role="img" aria-label="agent-dispatch：贵模型只做判断，便宜模型去干活">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#1e293b"/>
+    </linearGradient>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#64748b"/>
+    </marker>
+  </defs>
+  <rect width="1200" height="360" rx="18" fill="url(#bg)"/>
+  <g font-family="'Segoe UI','PingFang SC','Microsoft YaHei','Noto Sans CJK SC',sans-serif">
+    <text x="64" y="104" fill="#f8fafc" font-size="54" font-weight="700">agent-dispatch</text>
+    <text x="64" y="152" fill="#cbd5e1" font-size="26">贵模型只做判断，便宜模型去干活</text>
+    <text x="64" y="194" fill="#94a3b8" font-size="18">Claude Code / Codex · Orca · magpie · WSL · 多模型组合</text>
+    <text x="64" y="300" fill="#64748b" font-size="16">日常派活 · 初始化引导 · 反馈与复盘</text>
+
+    <rect x="650" y="56" width="200" height="64" rx="12" fill="#1d4ed8"/>
+    <text x="750" y="86" fill="#eff6ff" font-size="20" font-weight="600" text-anchor="middle">主脑</text>
+    <text x="750" y="108" fill="#bfdbfe" font-size="14" text-anchor="middle">拆解 · 决策 · 验收</text>
+
+    <line x1="720" y1="122" x2="680" y2="178" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="780" y1="122" x2="900" y2="178" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="560" y="182" width="220" height="58" rx="10" fill="#334155"/>
+    <text x="670" y="208" fill="#e2e8f0" font-size="17" text-anchor="middle">7 个只读子代理</text>
+    <text x="670" y="228" fill="#94a3b8" font-size="13" text-anchor="middle">探索 调研 审查 诊断 …</text>
+
+    <rect x="820" y="182" width="220" height="58" rx="10" fill="#334155"/>
+    <text x="930" y="208" fill="#e2e8f0" font-size="17" text-anchor="middle">Orca worker</text>
+    <text x="930" y="228" fill="#94a3b8" font-size="13" text-anchor="middle">并行实现 · 远程执行机</text>
+
+    <line x1="670" y1="242" x2="760" y2="284" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+    <line x1="930" y1="242" x2="840" y2="284" stroke="#64748b" stroke-width="2" marker-end="url(#arrow)"/>
+
+    <rect x="660" y="288" width="280" height="48" rx="10" fill="#0f766e"/>
+    <text x="800" y="318" fill="#ecfeff" font-size="17" text-anchor="middle">magpie 角色路由组 → 各家模型</text>
+
+    <path d="M1060 210 C1130 210 1130 88 860 88" fill="none" stroke="#f59e0b" stroke-width="2" stroke-dasharray="6 6" marker-end="url(#arrow)"/>
+    <text x="1130" y="150" fill="#fbbf24" font-size="15">复盘</text>
+    <text x="1130" y="170" fill="#fbbf24" font-size="15">迭代</text>
+  </g>
+</svg>
