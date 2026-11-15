@@ -19,6 +19,7 @@ class Combination(TypedDict):
     groups: dict[str, list[str]]
     member_specs: dict[str, list[str]]
     claude: dict[str, str]
+    claude_effort: dict[str, str]
 
 
 class CommandFailure(RuntimeError):
@@ -62,14 +63,18 @@ def normalize_target(value: str) -> str:
 def parse_combination_file(path: Path) -> Combination:
     specs: dict[str, list[str]] = {}
     aliases: dict[str, str] = {}
+    efforts: dict[str, str] = {}
     for number, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
         group = re.fullmatch(r"magpie\s+group\s+add\s+(\S+)\s+models=(\S+)(?:\s+.*)?", line)
         alias = re.fullmatch(r"magpie\s+claude\s+(opus|sonnet|haiku|fable|subagent)\s+(\S+)", line)
-        if re.fullmatch(r"magpie\s+claude\s+(opus|sonnet|haiku|fable|subagent)_effort\s+(medium|high|xhigh)", line):
-            continue  # 档位的推理档只由切换脚本执行，体检不比对
+        effort = re.fullmatch(r"magpie\s+claude\s+(opus|sonnet|haiku|fable|subagent)_effort\s+(medium|high|xhigh)", line)
+        if effort:
+            name, level = effort.groups()
+            efforts[name] = level
+            continue
         if group:
             name, members = group.groups()
             parts = members.split(",")
@@ -85,7 +90,7 @@ def parse_combination_file(path: Path) -> Combination:
             raise ValueError(f"组合文件第 {number} 行不是支持的组或档位命令")
     if not specs:
         raise ValueError("组合文件没有有效的 magpie group add 行")
-    return {"groups": {name: [normalize_model(member) for member in members] for name, members in specs.items()}, "member_specs": specs, "claude": aliases}
+    return {"groups": {name: [normalize_model(member) for member in members] for name, members in specs.items()}, "member_specs": specs, "claude": aliases, "claude_effort": efforts}
 
 
 def config_root(dispatch_root: Path) -> Path:
@@ -131,6 +136,18 @@ def parse_magpie_claude_output(output: str) -> dict[str, str]:
     return mappings
 
 
+def parse_magpie_claude_main_model(output: str) -> str:
+    match = re.search(r"(?:^|\n)\s*Claude Code\s+(\S+/\S+)", strip_ansi(output))
+    if match is None:
+        raise ValueError("无法解析 magpie claude 的主会话模型")
+    return normalize_target(match.group(1))
+
+
+def parse_magpie_claude_effort_output(output: str) -> dict[str, str]:
+    """仅提取具名别名的推理档，不把主会话 effort 和 auto mode 当成别名。"""
+    return {"subagent" if alias == "subagents" else alias: level for alias, level in re.findall(r"\b(opus|sonnet|haiku|fable|subagents?)\s+effort\s+(\S+)", strip_ansi(output))}
+
+
 def load_config(path: Path) -> dict:
     if not path.exists():
         raise ValueError('缺少 个人配置目录（~/.claude/派活配置）下的 检查配置.json；示例：{"检查超时秒":30,"远程环境":[],"扩展检查":[],"落点检查":{"兜底最少请求数":10,"兜底占比阈值":0.3}}')
@@ -143,6 +160,9 @@ def load_config(path: Path) -> dict:
     timeout = config.setdefault("检查超时秒", 30)
     if type(timeout) not in (int, float) or not math.isfinite(timeout) or timeout <= 0:
         raise ValueError("检查超时秒必须是正数")
+    worker_limit = config.setdefault("worker上限", 7)
+    if type(worker_limit) is not int or worker_limit <= 0:
+        raise ValueError("worker上限必须是正整数")
     landing = config.setdefault("落点检查", {})
     if not isinstance(landing, dict):
         raise ValueError("落点检查配置必须是对象")
@@ -189,11 +209,16 @@ def write_state(path: Path, data: dict) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def run_command(command: list[str], timeout: float = 30) -> str:
+def run_command(command: list[str], timeout: float = 30, *, environment_updates: dict[str, str | None] | None = None) -> str:
     executable = shutil.which(command[0])
     if executable is None:
         raise CommandFailure(f"命令 {Path(command[0]).name} 未找到")
     environment = os.environ.copy()
+    for key, value in (environment_updates or {}).items():
+        if value is None:
+            environment.pop(key, None)
+        else:
+            environment[key] = value
     environment["NO_COLOR"] = "1"
     process = subprocess.Popen([executable, *command[1:]], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8", errors="replace", env=environment, start_new_session=os.name != "nt")
     try:

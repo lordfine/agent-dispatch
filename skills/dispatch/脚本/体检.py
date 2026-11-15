@@ -6,13 +6,14 @@ import argparse
 import json
 import math
 import operator
+import os
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
 
-from 组合解析 import CommandFailure, Combination, config_root, load_config, load_current_combination, parse_magpie_claude_output, parse_magpie_groups_output, run_cli, run_command, write_state
+from 组合解析 import CommandFailure, Combination, config_root, load_config, load_current_combination, parse_magpie_claude_output, parse_magpie_claude_effort_output, parse_magpie_groups_output, run_cli, run_command, write_state
 
 
 DISPATCH_ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +21,7 @@ CONFIG_ROOT = config_root(DISPATCH_ROOT)
 STATE_ROOT = CONFIG_ROOT / "状态"
 
 
-def compare_combination(expected_groups: dict[str, list[str]], actual_groups: dict[str, list[str]], expected_claude: dict[str, str], actual_claude: dict[str, str]) -> list[dict[str, str]]:
+def compare_combination(expected_groups: dict[str, list[str]], actual_groups: dict[str, list[str]], expected_claude: dict[str, str], actual_claude: dict[str, str], expected_effort: dict[str, str] | None = None, actual_effort: dict[str, str] | None = None) -> list[dict[str, str]]:
     differences: list[dict[str, str]] = []
     for name, expected in expected_groups.items():
         actual = actual_groups.get(name)
@@ -30,6 +31,10 @@ def compare_combination(expected_groups: dict[str, list[str]], actual_groups: di
         actual = actual_claude.get(alias)
         if actual != expected:
             differences.append({"message": f"档位 {alias} 不一致：期望 {expected}；实际 {actual or '缺失'}"})
+    for alias, expected in (expected_effort or {}).items():
+        actual = (actual_effort or {}).get(alias)
+        if actual != expected:
+            differences.append({"message": f"推理档 {alias} 不一致：期望 {expected}；实际 {actual or '缺失'}"})
     return differences
 
 
@@ -47,11 +52,12 @@ def check_combination(timeout: float) -> tuple[bool, str]:
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise TimeoutError("组合一致检查超时")
-    aliases = parse_magpie_claude_output(run_command(["magpie", "claude"], remaining))
+    output = run_command(["magpie", "claude"], remaining)
+    aliases = parse_magpie_claude_output(output)
     if not groups or not aliases:
         raise ValueError("无法解析 magpie 的组或档位输出，需确认 CLI 输出格式")
-    differences = compare_combination(combination["member_specs"], groups, combination["claude"], aliases)
-    return (False, "；".join(item["message"] for item in differences)) if differences else (True, "当前组合成员、顺序、档位及 fast 标记一致")
+    differences = compare_combination(combination["member_specs"], groups, combination["claude"], aliases, combination["claude_effort"], parse_magpie_claude_effort_output(output))
+    return (False, "；".join(item["message"] for item in differences)) if differences else (True, "当前组合成员、顺序、档位和推理档一致")
 
 
 def parse_orca_status(output: str) -> dict:
@@ -97,6 +103,86 @@ def check_remote(environment: str, timeout: float) -> tuple[bool, str]:
     runtime = result["runtime"]
     ready = runtime.get("reachable") is True and runtime.get("state") == "ready"
     return ready, "远程运行时可达" if ready else "远程运行时不可达或尚未就绪"
+
+
+FINISHED_STATES = {"succeeded", "failed", "stopped", "cancelled", "canceled", "released"}
+ACTIVE_STATES = {"ready", "running", "dispatched", "starting", "working"}
+
+
+def count_workers(rows: list[dict]) -> dict[str, int]:
+    """按任务状态计在跑：远程 worker 在本机账上的存活状态是 unverifiable，不能只认 liveness=live（2026-11-16 实测漏数）。"""
+    counts = {"running": 0, "unknown": 0, "stop_unknown": 0, "exited": 0, "finished": 0}
+    for row in rows:
+        state = row.get("state")
+        if state == "stop_unknown":
+            counts["stop_unknown"] += 1
+        elif row.get("liveness") == "exited":
+            counts["exited"] += 1
+        elif state in FINISHED_STATES:
+            counts["finished"] += 1
+        elif row.get("liveness") == "live" or row.get("outcome") == "in_progress" or state in ACTIVE_STATES:
+            counts["running"] += 1
+        else:
+            counts["unknown"] += 1
+    return counts
+
+
+def compare_worker_limit(local: dict[str, int], remotes: dict[str, dict[str, int]], limit: int) -> tuple[bool, str]:
+    counts = [local, *remotes.values()]
+    remote_running = sum(item["running"] for item in remotes.values())
+    message = f"本机账上 {local['running']}（含从本机派到远程机的）/ 远程机自己账上 {remote_running}，上限 {limit}"
+    if remotes:
+        message += "；远程分项：" + "、".join(f"{name} {item['running']}" for name, item in remotes.items())
+    unknown = sum(item["unknown"] for item in counts)
+    stopped = sum(item["stop_unknown"] for item in counts)
+    exited = sum(item["exited"] for item in counts)
+    finished = sum(item.get("finished", 0) for item in counts)
+    message += f"；已退出 {exited}，已结束 {finished}，停止结果未知 {stopped}（均不计在跑）"
+    if unknown:
+        message += f"；状态不明 {unknown}（本机 {local['unknown']} / 远程 {sum(item['unknown'] for item in remotes.values())}），未计入"
+    if local["running"] + remote_running >= limit:
+        return False, message + "；已到上限，先别再派"
+    return True, message
+
+
+def check_workers(config: dict, timeout: float) -> tuple[bool, str]:
+    deadline = time.monotonic() + timeout
+    executable = os.environ.get("ORCA_CLI_COMMAND") or ("orca-dev" if os.environ.get("ORCA_DEV_REPO_ROOT") else "orca")
+
+    def read_workers(environment: str) -> dict[str, int]:
+        rows: list[dict] = []
+        seen_cursors: set[str] = set()
+        cursor: str | None = None
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("在跑 worker 检查超时")
+            command = [executable, "orchestration", "worker-list", "--environment", environment, "--json"]
+            if cursor:
+                command.extend(["--cursor", cursor])
+            # 仅对子进程清除会话绑定，否则 CLI 默认只查当前 Run，漏掉其他会话。
+            output = run_command(command, remaining, environment_updates={"ORCA_AGENT_SESSION_ID": None})
+            try:
+                data = json.loads(output)
+                result = data["result"]
+                page = result["workers"]
+                if data.get("ok") is not True or not isinstance(page, list) or any(not isinstance(row, dict) for row in page):
+                    raise ValueError
+                if result.get("scope", {}).get("source") not in (None, "all"):
+                    raise ValueError
+                cursor = result.get("nextCursor")
+                if cursor is not None and (not isinstance(cursor, str) or not cursor or cursor in seen_cursors):
+                    raise ValueError
+            except (KeyError, TypeError, AttributeError, ValueError) as exc:
+                raise ValueError(f"无法解析 {environment} 的全机 worker 列表或分页") from exc
+            rows.extend(page)
+            if cursor is None:
+                return count_workers(rows)
+            seen_cursors.add(cursor)
+
+    local = read_workers("local")
+    remotes = {name: read_workers(name) for name in config.get("远程环境", []) if name != "local"}
+    return compare_worker_limit(local, remotes, config.get("worker上限", 7))
 
 
 def check_mcp(timeout: float) -> tuple[bool, str]:
@@ -150,6 +236,7 @@ def main(argv: list[str] | None = None) -> int:
         checks.append((f"远程 {environment}", lambda name=environment: check_remote(name, timeout)))
     if not config.get("远程环境"):
         checks.append(("远程服务器", lambda: (True, "未配置远程环境")))
+    checks.append(("在跑 worker", lambda: check_workers(config, timeout)))
     checks.append(("MCP", lambda: check_mcp(timeout)))
     for rule in config.get("扩展检查", []):
         checks.append((rule["名称"], lambda item=rule: check_extension(item, timeout)))

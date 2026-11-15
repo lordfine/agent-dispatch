@@ -16,6 +16,52 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from 落点检查 import analyze_usage, filter_notification_groups, main, parse_usage_csv, show_toast
 
 
+class 落点补充统计测试(unittest.TestCase):
+    def test_日志导入行在所有统计前排除(self):
+        from 落点检查 import filter_request_rows
+        行 = [{"source": "log", "status": "200", "requested_model": "group/a", "provider": "p", "served_model": "越界"},
+              {"source": "", "status": "200", "requested_model": "group/a", "provider": "p", "served_model": "主"}]
+        self.assertEqual(filter_request_rows(行), [行[1]])
+        self.assertEqual(analyze_usage(行, {"a": ["p/主"]}), [])
+
+    def test_直接模型按会话去重排除主会话和组请求(self):
+        from 落点检查 import count_direct_model_sessions
+        from 组合解析 import parse_magpie_claude_main_model
+        主模型 = parse_magpie_claude_main_model("Claude Code p/main[1m] · effort — · opus group/impl · auto mode group/impl-lite")
+        self.assertEqual(主模型, "p/main")
+        行 = [
+            {"requested_model": "p/直接", "session": "甲", "status": "200"},
+            {"requested_model": "p/直接", "session": "甲", "status": "200"},
+            {"requested_model": "p/直接", "session": "乙", "status": "500"},
+            {"requested_model": "p/缺标识", "session": "", "status": "200"},
+            {"requested_model": "p/main[1m]", "session": "主"},
+            {"requested_model": "main", "session": "主"},
+            {"requested_model": "group/a", "session": "组"},
+            {"requested_model": "p/直接", "session": "丙", "source": "log"},
+        ]
+        self.assertEqual(count_direct_model_sessions(行, 主模型), {
+            "p/直接": {"sessions": 2, "requests": 3, "missing_sessions": 0},
+            "p/缺标识": {"sessions": 0, "requests": 1, "missing_sessions": 1},
+        })
+
+    def test_兜底告警保留每个落点的明细计数(self):
+        行 = [{"requested_model": "group/a", "provider": "p", "served_model": 名, "status": "200"} for 名 in ["主"] * 6 + ["备"] * 4 + ["组外"]]
+        问题 = analyze_usage(行, {"a": ["p/主", "p/备"]})
+        消息 = next(项["message"] for 项 in 问题 if 项["type"] == "fallback_ratio")
+        for 明细 in ("p/主（6 次）", "p/备（4 次）", "p/组外（1 次）"):
+            self.assertIn(明细, 消息)
+
+    def test_直接派法独立展示且不改变precheck退出行为(self):
+        组合 = {"groups": {"a": ["p/主"]}}
+        配置 = {"检查超时秒": 30, "落点检查": {"兜底最少请求数": 10, "兜底占比阈值": 0.3}}
+        CSV = "requested_model,provider,served_model,status,session,source\np/直接,p,直接,200,甲,\n"
+        for 参数, 预期退出码 in ((["--不通知"], 0), (["--precheck", "--不通知"], 1)):
+            with patch("落点检查.load_config", return_value=配置), patch("落点检查.load_current_combination", return_value=组合), patch("落点检查.run_command", side_effect=[CSV, "Claude Code p/main · opus group/a"]), patch("sys.stdout", new_callable=io.StringIO) as 输出:
+                self.assertEqual(main(参数), 预期退出码)
+            self.assertIn("直接写模型名的派法", 输出.getvalue())
+            self.assertIn("p/直接：1 个会话", 输出.getvalue())
+
+
 class 落点判定测试(unittest.TestCase):
     def test_CSV识别越界和兜底且忽略失败与直接请求(self):
         表头 = "requested_model,provider,served_model,model,status\n"

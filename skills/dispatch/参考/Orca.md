@@ -2,7 +2,7 @@
 
 需要：底座层（Orca）。远程执行机上的写法另见 `远程执行机.md`。
 
-先跑一次 `orca skills get orchestration` 读版本匹配的指南；这里只记录官方指南没有写到的 Orca 坑，历史 worker 启动、复用和提示卡问题是在 Orca 1.4.250 上实测的。
+先跑一次 `orca skills get orchestration` 读版本匹配的指南；这里只记录官方指南没有写到的 Orca 坑。当前版本 1.4.258（2026-11-16 核对）；下面标了版本号的条目是在那个版本上实测的，升级后先看官方指南有没有改。
 
 ## 启动
 
@@ -14,8 +14,9 @@ orca orchestration worker-start --spec-file <说明.md> --task-title "<标题>" 
 ```
 
 - 由 `worker-start` 建 worker 的工作区；受监督的 worker 不要先自己 `worktree create`。改同一批文件的 worker 各用独立工作区。`--keep-open` 表示保留可见终端，用户可以查看和插话。远程 worker 只用 Dispatch ID 称呼。
-- `--agent codex` 只在需要 Codex 自己的工具链或做对比时使用：`--model` 写裸模型名，从在用组合 impl 组成员里取，去掉 `codex/` 前缀和 `:档位`、`:fast` 后缀（Orca 1.4.250 实测）；fast 在 `~/.codex/config.toml` 全局开。直接写 `codex/模型名` 的写法作废，模型名只出现在组合文件里。Codex worker 不读 `~/.claude`，附加规则要抄进说明；它只认 `~/.codex/AGENTS.md`（暂不改）。Codex 原生 worker 遇到上游卡顿、请求被取消后不会自己重试，会一直挂着（1.4.251 实测）；超过 10 分钟没动静就 `worker-stop` 后重派。
+- `--agent codex` 只在需要 Codex 自己的工具链或做对比时使用：`--model` 写裸模型名，从在用组合 impl 组成员里取，去掉 `codex/` 前缀和 `:档位` 后缀（Orca 1.4.250 实测）。默认不开 fast（11-10 作者定），要开须用户本人点名。直接写 `codex/模型名` 的写法作废，模型名只出现在组合文件里。Codex worker 不读 `~/.claude`，附加规则要抄进说明；它只认 `~/.codex/AGENTS.md`（暂不改）。Codex 原生 worker 遇到上游卡顿、请求被取消后不会自己重试，会一直挂着（1.4.251 实测）；超过 10 分钟没动静就 `worker-stop` 后重派。
 - 非 Git 文件夹可以登记：`orca repo add --path <绝对路径> --kind folder --json`。
+- 远程执行机上的工作区，`worktree list`、`worktree rm` 也要带 `--environment <远程服务器名>`，不带只看到本机的，会误以为已经删掉或不存在。复用已有工作区（`--worktree <精确选择器>`）时不能再带 `--name`。
 
 ## 等待和追加
 

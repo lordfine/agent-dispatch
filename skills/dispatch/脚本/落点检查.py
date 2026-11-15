@@ -16,7 +16,7 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from 组合解析 import config_root, load_config, load_current_combination, normalize_model, normalize_target, run_cli, run_command, write_state
+from 组合解析 import config_root, load_config, load_current_combination, normalize_model, normalize_target, parse_magpie_claude_main_model, run_cli, run_command, write_state
 
 
 DISPATCH_ROOT = Path(__file__).resolve().parents[1]
@@ -33,9 +33,33 @@ def parse_usage_csv(text: str) -> list[dict[str, str]]:
     return rows
 
 
+def filter_request_rows(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """日志导入行不是派活请求；旧版 CSV 没有 source 列时仍保留。"""
+    return [row for row in rows if row.get("source", "").strip().lower() != "log"]
+
+
+def count_direct_model_sessions(rows: list[dict[str, str]], main_model: str) -> dict[str, dict[str, int]]:
+    main_model = normalize_target(main_model)
+    sessions: dict[str, set[str]] = {}
+    counts: dict[str, dict[str, int]] = {}
+    for row in filter_request_rows(rows):
+        requested = normalize_target(row.get("requested_model", "").strip())
+        if not requested or requested.startswith("group/") or requested in (main_model, main_model.split("/", 1)[-1]):
+            continue
+        count = counts.setdefault(requested, {"sessions": 0, "requests": 0, "missing_sessions": 0})
+        count["requests"] += 1
+        session = row.get("session", "").strip()
+        if session:
+            sessions.setdefault(requested, set()).add(session)
+            count["sessions"] = len(sessions[requested])
+        else:
+            count["missing_sessions"] += 1
+    return dict(sorted(counts.items()))
+
+
 def analyze_usage(rows: list[dict[str, str]], groups: dict[str, list[str]], fallback_min_requests: int = 10, fallback_ratio: float = 0.3) -> list[dict[str, str]]:
     grouped: dict[str, Counter[str]] = {}
-    for row in rows:
+    for row in filter_request_rows(rows):
         if not re.fullmatch(r"2\d\d", str(row.get("status", "")).strip()):
             continue
         requested = row.get("requested_model", "").strip()
@@ -60,7 +84,8 @@ def analyze_usage(rows: list[dict[str, str]], groups: dict[str, list[str]], fall
         total = sum(counts.values())
         fallback = total - counts[members[0]]
         if total > fallback_min_requests and fallback / total > fallback_ratio:
-            issues.append({"type": "fallback_ratio", "group": name, "message": f"兜底偏高：组 {name} 共 {total} 次，非第一顺位 {fallback} 次（{fallback / total:.1%}，阈值 {fallback_ratio:.1%}）"})
+            details = "、".join(f"{model}（{count} 次）" for model, count in sorted(counts.items()))
+            issues.append({"type": "fallback_ratio", "group": name, "message": f"兜底偏高：组 {name} 共 {total} 次，非第一顺位 {fallback} 次（{fallback / total:.1%}，阈值 {fallback_ratio:.1%}）；实际模型明细：{details}"})
     return issues
 
 
@@ -128,7 +153,15 @@ def main(argv: list[str] | None = None) -> int:
         combination = load_current_combination(DISPATCH_ROOT)
         text = run_command(["magpie", "usage", "--csv", "--last", args.窗口], config["检查超时秒"])
         landing = config["落点检查"]
-        issues = analyze_usage(parse_usage_csv(text), combination["groups"], landing["兜底最少请求数"], landing["兜底占比阈值"])
+        rows = filter_request_rows(parse_usage_csv(text))
+        main_model = parse_magpie_claude_main_model(run_command(["magpie", "claude"], config["检查超时秒"]))
+        direct = count_direct_model_sessions(rows, main_model)
+        if direct:
+            print("直接写模型名的派法（按模型分别统计会话，同一会话可出现在多个模型下）：")
+            for model, count in direct.items():
+                missing = f"；另有 {count['missing_sessions']} 条缺会话标识，未计入会话数" if count["missing_sessions"] else ""
+                print(f"  {model}：{count['sessions']} 个会话，{count['requests']} 条请求{missing}")
+        issues = analyze_usage(rows, combination["groups"], landing["兜底最少请求数"], landing["兜底占比阈值"])
         if not issues:
             print("落点正常")
             return 1 if precheck else 0

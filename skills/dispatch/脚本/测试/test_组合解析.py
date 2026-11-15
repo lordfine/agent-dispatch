@@ -12,6 +12,17 @@ from 组合解析 import CommandFailure, load_current_combination, parse_combina
 
 
 class 组合解析测试(unittest.TestCase):
+    def test_组合保留声明的别名推理档(self):
+        with tempfile.TemporaryDirectory() as 临时目录:
+            文件 = Path(临时目录) / "组合.txt"
+            文件.write_text("magpie group add impl models=p/m\nmagpie claude opus_effort high\nmagpie claude fable_effort medium\n", encoding="utf-8")
+            self.assertEqual(parse_combination_file(文件)["claude_effort"], {"opus": "high", "fable": "medium"})
+
+    def test_展示推理档不混入主会话和auto(self):
+        from 组合解析 import parse_magpie_claude_effort_output
+        输出 = "Claude Code p/main · effort xhigh · opus group/impl · opus effort medium · sonnet effort high · auto mode group/impl-lite"
+        self.assertEqual(parse_magpie_claude_effort_output(输出), {"opus": "medium", "sonnet": "high"})
+
     def test_解析成员保留原写法并提供落点标识(self):
         with tempfile.TemporaryDirectory() as 临时目录:
             文件 = Path(临时目录) / "组合.txt"
