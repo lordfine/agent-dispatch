@@ -1,0 +1,17 @@
+# 复制到个人配置目录下的 执行机.toml；名称、发行版和地址均为占位符。
+version = 1
+
+[executors."本机示例"]
+transport = "wsl"
+distro = "<发行版名称>"
+platform = "linux"
+workdir = "/home/<用户>/work"
+orca_name = "<远程服务器名称>"
+
+[executors."远程示例"]
+transport = "ssh"
+ssh_host = "<SSH别名>"
+platform = "linux"
+workdir = "/home/<用户>/work"
+orca_name = "<远程服务器名称>"
+magpie_url = "http://<局域网地址>:<端口>"

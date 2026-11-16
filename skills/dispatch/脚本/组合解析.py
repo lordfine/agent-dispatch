@@ -94,12 +94,17 @@ def parse_combination_file(path: Path) -> Combination:
 
 
 def config_root(dispatch_root: Path) -> Path:
-    """个人配置目录：环境变量 DISPATCH_CONFIG_DIR，其次 ~/.claude/派活配置，最后是旧位置 <skill>/本机。"""
+    """环境变量 → 含 config.toml 的新目录 → 两处旧目录 → 新目录落点。"""
     env = os.environ.get("DISPATCH_CONFIG_DIR")
     if env:
         return Path(env).expanduser()
-    default = Path.home() / ".claude" / "派活配置"
-    return default if default.is_dir() else dispatch_root / "本机"
+    default = Path.home() / ".dispatch"
+    if (default / "config.toml").is_file():
+        return default
+    for legacy in (Path.home() / ".claude" / "派活配置", dispatch_root / "本机"):
+        if legacy.is_dir():
+            return legacy
+    return default
 
 
 def combination_dir(dispatch_root: Path) -> Path:

@@ -6,14 +6,14 @@ description: 派活框架的初始化引导与复盘：首次安装后生成个�
 
 # 派活引导与复盘
 
-个人配置在 `~/.claude/派活配置/`（环境变量 `DISPATCH_CONFIG_DIR` 可改）。这里只改个人配置；框架文件（`~/.claude/skills/dispatch*`、`~/.claude/agents/`）只在用户要求升级或修改框架时动，引导里需要改 agent 文件的一步也要用户点头。日常派活的规则见 `dispatch` 手册，这里不重复。
+个人配置默认在 `~/.dispatch/`（个人配置目录按这个顺序找：环境变量 `DISPATCH_CONFIG_DIR`；`~/.dispatch/`（里面有 `config.toml` 时）；旧位置 `~/.claude/派活配置/`（目录存在时）；更早版本的 dispatch 技能目录下的 `本机/`（目录存在时）；都没有就是 `~/.dispatch/`）。这里只改个人配置；框架文件（技能目录 `~/.claude/skills/dispatch*` 或 `~/.agents/skills/dispatch*`，角色 `~/.claude/agents/` 或 `<Codex家>/agents/`）只在用户要求升级或修改框架时动，引导里需要改 agent 文件的一步也要用户点头。日常派活的规则见 `dispatch` 手册，这里不重复。
 
 ## 原则
 
 - 推荐由用户决定：每条推荐写证据、预期收益、代价、能不能撤回；问题一次问完，用大白话，每个给推荐；用户点头才改。
 - 证据说话：数字来自机器探测、magpie 用量、Orca 派活历史、派活记录、反馈文档；样本小、任务不等难时写成待验证假设，不当因果结论。
 - 和手册一致：资源紧时依次减并发、降推理档、换常规模型，最后才减审查；验收标准不随资源降低。
-- 改 magpie、代理、网络路由、`~/.claude/settings.json`、`~/.claude/CLAUDE.md` 这类全局配置，先说清楚改什么、为什么，等用户同意；改前备份到 `~/.claude/备份/<日期>-<引导或复盘>前/`。
+- 改 magpie、代理、网络路由、`~/.claude/settings.json`、`~/.claude/CLAUDE.md`、`<Codex家>/config.toml`、`<Codex家>/AGENTS.md` 这类全局配置，先说清楚改什么、为什么，等用户同意；改前备份到 `~/.dispatch/备份/<日期>-<引导或复盘>前/`。`<Codex家>` 是 `CODEX_HOME`，没设就是 `~/.codex`。
 - 机械性的问题优先做成检查（体检的扩展检查、脚本），需要判断的写成规矩。
 - 转达给项目会话时，标明哪句是用户原话、哪句是建议。
 
@@ -27,18 +27,20 @@ description: 派活框架的初始化引导与复盘：首次安装后生成个�
    - agent 工具：`claude --version`、`codex --version`（没有就记无）。
    - 底座：`orca --version` 和远程服务器列表；`magpie groups`、`magpie accounts`、`magpie claude`（看有哪些模型来源、档位指到哪）。
    - 进阶：Windows 上 `wsl -l -v` 和发行版里的核数、内存、Docker；有没有登记过的远程执行机。
-   - 已有的 `~/.claude/CLAUDE.md` 里有没有派活片段，`~/.claude/agents/` 里 7 个 agent 在不在。
+   - Claude Code：`~/.claude/CLAUDE.md` 里有没有派活片段，`~/.claude/agents/` 里 7 个 agent 在不在。
+   - Codex：`<Codex家>/AGENTS.md` 里有没有派活片段，`<Codex家>/agents/` 里 7 个 toml 在不在，`~/.agents/skills/` 里有没有 dispatch；Codex 里能选哪些模型（问用户或看 Codex 的模型选择列表）。
 3. 定层级，告诉用户现在能用到哪层、缺的那层装了能多什么（Orca、magpie 的地址见框架仓库 README），装不装由用户定，不装也能用。
 4. 问用户：照 `模板/本机条件示例.md` 里探测不出来的项问，一次问完，每项给推荐。通常是：用哪些模型来源、订阅还是按量、每分钟请求上限、预算、额度到预警线时怎么办、质量和成本怎么取舍、哪些模型不用、浏览器验收要不要登录态。
 5. 生成个人配置：
    - `本机条件.md`：按示例的栏目写，数值写探测和回答的结果，注明日期和来源。
-   - 有 magpie 时：从 `~/.claude/skills/dispatch/组合/` 的示例里选一个复制到个人配置的 `组合/`，把 `<来源>` 占位换成用户的来源 id（`magpie providers` 查），按额度调成员和档位，写 `当前组合.txt`。
+   - `config.toml`（各角色走原生还是 Orca、宿主、模型、档位）：给 Codex 装过、装的时候又没有任何个人配置的，安装器写了一份默认的（先确认文件真的在）；对照用户 Codex 里实际能选的模型，把没有的改掉或删掉那一行；只用 Claude Code 加 magpie 的用户可以不写，沿用 agent 文件和路由组。写或改之前给用户看改前改后，同意再写，写完跑 `生效配置.py` 确认没报错。
+   - 有 magpie 时：从 dispatch 技能目录的 `组合/` 示例里选一个复制到个人配置的 `组合/`，把 `<来源>` 占位换成用户的来源 id（`magpie providers` 查），按额度调成员和档位，写 `当前组合.txt`。
    - `检查配置.json`（体检用），先写默认值：`{"检查超时秒":30,"远程环境":[],"扩展检查":[],"落点检查":{"兜底最少请求数":10,"兜底占比阈值":0.3}}`；有远程执行机时把它写进 `远程环境`，并写 `项目.json`。
-   - 没有 magpie 时：agent 文件里的 `model: group/...` 要改成 sonnet、haiku 这类别名或删掉。列出要改哪些 agent、改成什么，用户同意后再改，改前备份。
-6. 全局 CLAUDE.md：如果还没有派活片段，给用户看框架仓库 `CLAUDE.md片段.md` 里的那段，问要不要追加到 `~/.claude/CLAUDE.md` 末尾；同意后备份再追加。
+   - 用 Claude Code、没有 magpie 时：agent 文件里的 `model: group/...` 要改成 sonnet、haiku 这类别名或删掉。列出要改哪些 agent、改成什么，用户同意后再改，改前备份。
+6. 全局规则：如果还没有派活片段，给用户看框架仓库里对应的那段，问要不要追加；同意后备份再追加。Claude Code 用 `CLAUDE.md片段.md`，追加到 `~/.claude/CLAUDE.md` 末尾；Codex 用 `AGENTS.md片段.md`，追加到 `<Codex家>/AGENTS.md` 末尾。
 7. 应用组合会改 magpie，按 `dispatch` 手册的 `参考/组合与路由.md` 执行，先征得同意。
-8. 验证：跑 `python ~/.claude/skills/dispatch/脚本/体检.py`（没有 magpie、Orca 的项会报异常，向用户说明哪些可以忽略）；派一个 explorer 小活（如“看看当前目录是什么项目”），有 magpie 时用 `magpie usage --csv --last 1h` 核对它落在哪个模型。提醒用户新开会话后 CLAUDE.md 和新装的 agent 才生效。
-9. 在 `复盘记录.md` 写第一条：日期、层级、关键取值、待观察项。最后用三句话告诉用户日常怎么用：说“派活”或直接描述任务，主会话照 `dispatch` 手册派；一个批次做完让项目会话用 `dispatch-feedback` 写反馈；隔一段时间输入 `/dispatch-retro` 复盘。
+8. 验证：跑 dispatch 技能目录下的 `脚本/体检.py`（没装的工具会跳过并说明）；派一个 explorer 小活（如“看看当前目录是什么项目”），核对它实际落在哪个模型，方法见 dispatch 手册 `参考/宿主差异.md` 的“核对实际模型”。提醒用户新开会话后全局规则和新装的角色才生效。
+9. 在 `复盘记录.md` 写第一条：日期、层级、关键取值、待观察项。最后用三句话告诉用户日常怎么用：说“派活”或直接描述任务，主会话照 `dispatch` 手册派；一个批次做完让项目会话用 `dispatch-feedback` 写反馈；隔一段时间输入 `/dispatch-retro`（Codex 里是 `$dispatch-retro`）复盘。
 
 ## 模式二：定期复盘
 

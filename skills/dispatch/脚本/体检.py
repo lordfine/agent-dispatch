@@ -8,12 +8,14 @@ import math
 import operator
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 from 组合解析 import CommandFailure, Combination, config_root, load_config, load_current_combination, parse_magpie_claude_output, parse_magpie_claude_effort_output, parse_magpie_groups_output, run_cli, run_command, write_state
+from 生效配置 import load_effective_config
 
 
 DISPATCH_ROOT = Path(__file__).resolve().parents[1]
@@ -222,24 +224,43 @@ def check_extension(rule: dict, timeout: float) -> tuple[bool, str]:
     return True, f"{len(values)} 个数值均未触发 {comparison}{rule['阈值']:g}（范围 {min(values):g}～{max(values):g}）"
 
 
+def check_dispatch_config() -> tuple[bool, str]:
+    result = load_effective_config(Path.cwd(), CONFIG_ROOT / "config.toml")
+    errors = result["errors"]
+    if errors:
+        return False, f"{errors[0]}；共 {len(errors)} 条，跑 生效配置.py 看全部"
+    return True, "个人层和项目层配置正常" if any(result["files"].values()) else "没有个人或项目配置，使用默认约定"
+
+
+def optional_check(command: str, check):
+    """缺少可选工具时跳过；工具已装但运行失败仍交原有异常处理。"""
+    return lambda: check() if shutil.which(command) is not None else (True, f"跳过（没装 {command}）")
+
+
 def main(argv: list[str] | None = None) -> int:
     argparse.ArgumentParser(description="派活前只读体检，不调用模型").parse_args(argv)
     try:
-        config = load_config(CONFIG_ROOT / "检查配置.json")
+        if (CONFIG_ROOT / "检查配置.json").exists():
+            config = load_config(CONFIG_ROOT / "检查配置.json")
+        else:
+            print("没有 检查配置.json，用默认值")
+            config = {}
     except (OSError, ValueError) as exc:
         print(f"✗ 本机配置：{exc}")
         print("汇总：配置错误，体检未执行")
         return 2
     timeout = config.get("检查超时秒", 30)
-    checks = [("magpie", lambda: check_magpie(timeout)), ("组合一致", lambda: check_combination(timeout)), ("Orca", lambda: check_orca(timeout))]
+    checks = [("派活配置", check_dispatch_config), ("magpie", optional_check("magpie", lambda: check_magpie(timeout))), ("组合一致", optional_check("magpie", lambda: check_combination(timeout))), ("Orca", optional_check("orca", lambda: check_orca(timeout)))]
     for environment in config.get("远程环境", []):
-        checks.append((f"远程 {environment}", lambda name=environment: check_remote(name, timeout)))
+        checks.append((f"远程 {environment}", optional_check("orca", lambda name=environment: check_remote(name, timeout))))
     if not config.get("远程环境"):
         checks.append(("远程服务器", lambda: (True, "未配置远程环境")))
-    checks.append(("在跑 worker", lambda: check_workers(config, timeout)))
-    checks.append(("MCP", lambda: check_mcp(timeout)))
+    checks.append(("在跑 worker", optional_check("orca", lambda: check_workers(config, timeout))))
+    checks.append(("MCP", optional_check("claude", lambda: check_mcp(timeout))))
     for rule in config.get("扩展检查", []):
-        checks.append((rule["名称"], lambda item=rule: check_extension(item, timeout)))
+        check = lambda item=rule: check_extension(item, timeout)
+        command = Path(rule["命令"][0]).stem
+        checks.append((rule["名称"], optional_check(command, check) if command in ("magpie", "orca", "claude") else check))
     if not config.get("扩展检查"):
         checks.append(("本机扩展", lambda: (True, "未配置扩展检查")))
     passed = 0

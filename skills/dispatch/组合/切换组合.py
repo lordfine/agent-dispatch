@@ -20,8 +20,11 @@ import sys
 
 
 def 个人组合目录():
-    根 = os.path.expanduser(os.environ.get("DISPATCH_CONFIG_DIR") or os.path.join("~", ".claude", "派活配置"))
-    return os.path.join(根, "组合") if os.path.isdir(根) else None
+    from pathlib import Path
+    sys.path.insert(0, os.path.join(目录, "..", "脚本"))
+    from 组合解析 import config_root
+    根 = config_root(Path(目录).parent)
+    return os.path.join(根, "组合") if 根.is_dir() else None
 
 
 def 候选目录():

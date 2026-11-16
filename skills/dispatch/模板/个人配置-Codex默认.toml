@@ -1,0 +1,53 @@
+# agent-dispatch 个人默认配置（Codex 版，安装器生成）。改完从下一次派活生效。
+# 模型名是示例：你的 Codex 里没有某个模型时改成有的，或删掉 model 那一行，让子代理跟随主会话。
+# 并发上限不在这里，在同目录的 检查配置.json。
+version = 1
+
+[roles.explorer]
+mode = "native"
+host = "codex"
+model = "gpt-6.1-terra"
+effort = "medium"
+
+[roles.extractor]
+mode = "native"
+host = "codex"
+model = "gpt-6.1-terra"
+effort = "medium"
+
+[roles.writer]
+mode = "native"
+host = "codex"
+model = "gpt-6.1-terra"
+effort = "high"
+
+[roles.researcher]
+mode = "native"
+host = "codex"
+model = "gpt-6.1-sol"
+effort = "high"
+
+[roles.diagnoser]
+mode = "native"
+host = "codex"
+model = "gpt-6.1-sol"
+effort = "high"
+
+[roles.reviewer]
+mode = "native"
+host = "codex"
+model = "gpt-6.1-sol"
+effort = "xhigh"
+
+[roles.verifier]
+mode = "native"
+host = "codex"
+model = "gpt-6.1-sol"
+effort = "xhigh"
+
+# 实现只走 Orca worker；没装 Orca 时不派实现，主会话自己写。
+[roles.implementer]
+mode = "orca"
+host = "codex"
+model = "gpt-6.1-sol"
+effort = "high"

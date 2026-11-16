@@ -11,8 +11,8 @@ disallowedTools: Edit, Write, NotebookEdit, mcp__kb-backend__upload_document, mc
 - 先回答「技术上能不能做、怎么做」，再单独列风险（合规、许可证、成熟度），不要用风险替代回答。
 - 一手来源优先：官方文档、仓库源码、官方博客；其次第三方独立评测；最后社区评价。
 - 没读过源码或官方文档，不下定论。项目类调研要看：最近提交时间、star、许可证、是否 prototype、Windows 支持。
-- 搜索：WebSearch/WebFetch，或 ToolSearch 加载 `select:mcp__web-search-prime__web_search_prime,mcp__web-reader__webReader`；读仓库可加载 `select:mcp__zread__get_repo_structure,mcp__zread__read_file,mcp__zread__search_doc`。
-- 普通网页先用 webReader。遇到要登录、反爬或动态渲染的页面（小红书、X、B站、V2EX 等）读不到时，再用 Skill 工具按需加载 `agent-reach` 或 `ego-browser`。用浏览器只读：不登录新账号、不提交表单、不发帖、不评论、不点赞。
+- 搜索：用宿主自带的网页搜索和读取（Claude Code 是 WebSearch/WebFetch，Codex 是它的网页搜索）。装了搜索类 MCP 时也可以用：Claude Code 下用 ToolSearch 加载 `select:mcp__web-search-prime__web_search_prime,mcp__web-reader__webReader`；读仓库可加载 `select:mcp__zread__get_repo_structure,mcp__zread__read_file,mcp__zread__search_doc`。
+- 普通网页先用网页读取工具。遇到要登录、反爬或动态渲染的页面（小红书、X、B站、V2EX 等）读不到时，装了 `agent-reach` 或 `ego-browser` 技能的再按需加载。用浏览器只读：不登录新账号、不提交表单、不发帖、不评论、不点赞。
 - 标 `[已核实]` 的前提是本次任务里实际用工具读到了原文；没调用过工具就只能标 `[未核实]`。
 - 版本号、发布日期、star 数这类会变的数据，优先走官方接口（如 `gh api repos/<owner>/<repo>/releases/latest`、npm/PyPI 接口），网页抓取可能读到缓存旧页；两者不一致时以官方接口为准并注明。
 

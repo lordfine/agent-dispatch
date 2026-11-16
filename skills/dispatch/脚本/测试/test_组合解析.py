@@ -85,5 +85,38 @@ class 组合解析测试(unittest.TestCase):
             self.assertEqual(卡住.communicate.call_args_list, [call(timeout=0.01), call(timeout=5)])
 
 
+class 配置目录测试(unittest.TestCase):
+    def 核对目录(self, 预期, *, 新文件=False, 旧目录=False, 随技能=False, 环境=False):
+        from 组合解析 import config_root
+        with tempfile.TemporaryDirectory() as 临时目录:
+            家 = Path(临时目录)
+            skill = 家 / "skill"
+            # 仅有备份的新目录不能抢走兼容目录。
+            (家 / ".dispatch/备份").mkdir(parents=True)
+            if 新文件:
+                (家 / ".dispatch/config.toml").write_text("version=1", encoding="utf-8")
+            if 旧目录:
+                (家 / ".claude/派活配置").mkdir(parents=True)
+            if 随技能:
+                (skill / "本机").mkdir(parents=True)
+            with patch("组合解析.Path.home", return_value=家), patch.dict("os.environ", {"DISPATCH_CONFIG_DIR": str(家 / "指定")} if 环境 else {}, clear=True):
+                self.assertEqual(config_root(skill), 家 / 预期)
+
+    def test_环境变量优先(self):
+        self.核对目录("指定", 新文件=True, 旧目录=True, 随技能=True, 环境=True)
+
+    def test_含配置的新目录优先(self):
+        self.核对目录(".dispatch", 新文件=True, 旧目录=True, 随技能=True)
+
+    def test_旧配置优先且备份目录不抢配置(self):
+        self.核对目录(".claude/派活配置", 旧目录=True, 随技能=True)
+
+    def test_随技能旧目录回退(self):
+        self.核对目录("skill/本机", 随技能=True)
+
+    def test_无配置回退到新目录(self):
+        self.核对目录(".dispatch")
+
+
 if __name__ == "__main__":
     unittest.main()

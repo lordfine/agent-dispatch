@@ -129,9 +129,65 @@ class 额度规则测试(unittest.TestCase):
     def test_一项超时仍然执行其他项(self):
         with tempfile.TemporaryDirectory() as 临时目录:
             配置 = {"检查超时秒": 30, "远程环境": [], "扩展检查": []}
-            with patch("体检.load_config", return_value=配置), patch("体检.load_current_combination", return_value={"groups": {}, "member_specs": {}, "claude": {}}), patch("体检.check_magpie", side_effect=TimeoutError("超时")), patch("体检.check_combination", return_value=(True, "一致")), patch("体检.check_orca", return_value=(True, "运行中")), patch("体检.check_workers", return_value=(True, "空闲")), patch("体检.check_mcp", return_value=(True, "正常")) as 后项, patch("体检.STATE_ROOT", Path(临时目录)), patch("sys.stdout", new_callable=io.StringIO):
+            with patch("体检.CONFIG_ROOT", Path(临时目录)), patch("体检.shutil.which", side_effect=lambda 命令: 命令), patch("体检.load_config", return_value=配置), patch("体检.load_current_combination", return_value={"groups": {}, "member_specs": {}, "claude": {}}), patch("体检.check_magpie", side_effect=TimeoutError("超时")), patch("体检.check_combination", return_value=(True, "一致")), patch("体检.check_orca", return_value=(True, "运行中")), patch("体检.check_workers", return_value=(True, "空闲")), patch("体检.check_mcp", return_value=(True, "正常")) as 后项, patch("体检.STATE_ROOT", Path(临时目录)), patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(main([]), 1)
                 后项.assert_called_once()
+
+
+class 基础档体检测试(unittest.TestCase):
+    def test_已装命令运行失败仍异常且坏检查配置不被放过(self):
+        from 组合解析 import CommandFailure
+        with tempfile.TemporaryDirectory() as 临时:
+            根 = Path(临时)
+            with patch("体检.CONFIG_ROOT", 根), patch("体检.shutil.which", return_value="已安装"), patch("体检.run_command", side_effect=CommandFailure("命令失败，退出码 9")), patch("体检.Path.cwd", return_value=根), patch("sys.stdout", new_callable=io.StringIO) as 输出:
+                self.assertEqual(main([]), 1)
+                self.assertIn("命令失败，退出码 9", 输出.getvalue())
+                self.assertNotIn("跳过（没装", 输出.getvalue())
+            (根 / "检查配置.json").write_text("损坏的 JSON", encoding="utf-8")
+            with patch("体检.CONFIG_ROOT", 根), patch("体检.run_command") as 命令, patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(main([]), 2)
+                命令.assert_not_called()
+
+    def test_远程与扩展依赖缺命令也跳过(self):
+        import json
+        with tempfile.TemporaryDirectory() as 临时:
+            根 = Path(临时)
+            (根 / "检查配置.json").write_text(json.dumps({"远程环境": ["测试机"], "扩展检查": [{"名称": "额度", "命令": ["magpie", "accounts"], "正则": "(\\d+)", "阈值": 70}]}), encoding="utf-8")
+            with patch("体检.CONFIG_ROOT", 根), patch("体检.shutil.which", return_value=None), patch("体检.Path.cwd", return_value=根), patch("体检.run_command") as 命令, patch("sys.stdout", new_callable=io.StringIO) as 输出:
+                self.assertEqual(main([]), 0)
+                命令.assert_not_called()
+                self.assertIn("远程 测试机：跳过（没装 orca）", 输出.getvalue())
+                self.assertIn("额度：跳过（没装 magpie）", 输出.getvalue())
+
+    def test_缺检查配置和工具仍正常且全跳过(self):
+        with tempfile.TemporaryDirectory() as 临时:
+            根 = Path(临时)
+            with patch("体检.CONFIG_ROOT", 根), patch("体检.shutil.which", return_value=None), patch.dict("os.environ", {"DISPATCH_CONFIG_DIR": str(根)}), patch("体检.Path.cwd", return_value=根), patch("体检.run_command") as 命令, patch("sys.stdout", new_callable=io.StringIO) as 输出:
+                self.assertEqual(main([]), 0)
+                命令.assert_not_called()
+                self.assertIn("没有 检查配置.json，用默认值", 输出.getvalue())
+                for 名 in ("magpie", "orca", "claude"):
+                    self.assertIn(f"跳过（没装 {名}）", 输出.getvalue())
+                self.assertIn("派活配置", 输出.getvalue())
+
+    def test_派活配置缺省原生方式的非法Claude模型算异常(self):
+        with tempfile.TemporaryDirectory() as 临时:
+            根 = Path(临时)
+            (根 / "config.toml").write_text('version=1\n[roles.reviewer]\nhost="claude-code"\nmodel="group/impl"\n', encoding="utf-8")
+            with patch("体检.CONFIG_ROOT", 根), patch("体检.shutil.which", return_value=None), patch("体检.Path.cwd", return_value=根), patch("sys.stdout", new_callable=io.StringIO) as 输出:
+                self.assertEqual(main([]), 1)
+                self.assertIn("✗ 派活配置", 输出.getvalue())
+                self.assertIn("roles.reviewer.model", 输出.getvalue())
+                self.assertIn("共 1 条，跑 生效配置.py 看全部", 输出.getvalue())
+
+    def test_派活配置出错列首条和总数(self):
+        with tempfile.TemporaryDirectory() as 临时:
+            根 = Path(临时)
+            (根 / "config.toml").write_text('version=2\nmax_workers=3\n', encoding="utf-8")
+            with patch("体检.CONFIG_ROOT", 根), patch("体检.shutil.which", return_value=None), patch.dict("os.environ", {"DISPATCH_CONFIG_DIR": str(根)}), patch("体检.Path.cwd", return_value=根), patch("sys.stdout", new_callable=io.StringIO) as 输出:
+                self.assertEqual(main([]), 1)
+                self.assertIn("✗ 派活配置", 输出.getvalue())
+                self.assertIn("共 2 条，跑 生效配置.py 看全部", 输出.getvalue())
 
 
 if __name__ == "__main__":

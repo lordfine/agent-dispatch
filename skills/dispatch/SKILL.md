@@ -1,13 +1,15 @@
 ---
 name: dispatch
-description: 派活手册（Opus 主脑模式）。主会话（如 Opus 5.5）要把摸底、调研、审查、诊断、抽取、写文档、实现等工作派给便宜模型时使用：派给谁、走原生子代理还是 Orca worker、任务说明怎么写、怎么验收、报错怎么改派。说「派活」「派出去」「开 worker」「让 GLM/MiniMax/DeepSeek/Codex 去做」「切组合」时触发。
+description: 派活手册（主脑模式，Claude Code 和 Codex 通用）。主会话（如 Opus 5.5，或 Codex 里的强模型）要把摸底、调研、审查、诊断、抽取、写文档、实现等工作派给便宜模型时使用：派给谁、走原生子代理还是 Orca worker、任务说明怎么写、怎么验收、报错怎么改派。说「派活」「派出去」「开 worker」「让 GLM/MiniMax/DeepSeek/Codex 去做」「切组合」时触发。
 ---
 
 # 派活手册
 
 ## 0. 先读个人配置
 
-个人配置在 `~/.claude/派活配置/`（环境变量 `DISPATCH_CONFIG_DIR` 可改；旧路径 `~/.claude/skills/dispatch/本机/` 是指向它的联接，照样能用）。派活前先读里面的 `本机条件.md`：在用组合、并发、额度、机器、有没有远程执行机、模型禁忌。没有这个目录或文件时，先用 `dispatch-retro` 走初始化引导，不凭空假设。
+个人配置在 `~/.dispatch/`（环境变量 `DISPATCH_CONFIG_DIR` 可改；还没有 `~/.dispatch/config.toml` 时读旧位置 `~/.claude/派活配置/`，老用户不用搬）。派活前先读里面的 `本机条件.md`：在用组合、并发、额度、机器、有没有远程执行机、模型禁忌。每次派活前在项目目录跑一次 `python <本技能目录>/脚本/生效配置.py`，看各角色走原生子代理还是 Orca、哪个宿主、什么模型和档位：个人配置 `config.toml` 和项目根的 `.dispatch.toml`（覆盖个人）哪个有都算，两个都没有时它列出的就是默认值。没有个人配置时，先用 `dispatch-retro` 走初始化引导，不凭空假设。
+
+主会话是 Codex 时，先读 `参考/宿主差异.md`：技能和角色装在哪、模型和档位怎么传、只读怎么核对，和 Claude Code 不一样。本手册里的路由组、别名和 magpie 档位，只对 Claude Code 加 magpie 适用。
 
 资源分机器（CPU、内存、有没有 WSL/Docker、能开几个测试进程和浏览器）和额度（模型来源、订阅还是按量、每分钟请求上限、预算）；具体数值只写在个人配置里。资源紧时依次减并发、降推理档、换常规模型（impl-lite 或 impl），最后才减审查；验收标准不随资源降低。资源充裕时反过来，可以多开并发、用强模型、多人核验。
 
@@ -17,7 +19,7 @@ description: 派活手册（Opus 主脑模式）。主会话（如 Opus 5.5）�
 
 ## 1. 派给谁
 
-每个角色对应一个 magpie 角色路由组，组里现在是谁由个人配置里的在用组合决定（见 `参考/组合与路由.md`）。看当前组合和各组成员时，读个人配置的 `组合/当前组合.txt`、对应组合文件和 `magpie groups`；成员和兜底顺序以组合文件为准。
+个人或项目写了配置的，各角色的方式、宿主、模型、档位以生效配置为准；下面路由组这一栏是 Claude Code 加 magpie 时的默认。每个角色对应一个 magpie 角色路由组，组里现在是谁由个人配置里的在用组合决定（见 `参考/组合与路由.md`）。看当前组合和各组成员时，读个人配置的 `组合/当前组合.txt`、对应组合文件和 `magpie groups`；成员和兜底顺序以组合文件为准。
 
 原生子代理（只读或短活，结果直接回到主会话）：
 
@@ -46,10 +48,11 @@ Orca worker（要改代码、耗时长、要并行、要别的 agent；怎么起
 
 ## 2. 硬规则
 
-- 调用具名 agent **不传 `model`**，让 frontmatter 生效。
-- **不用内置 Explore / Plan**：它们的模型由 Claude Code 按环境决定，可能落到 Opus，也不受 agent 文件控制；具名 explorer 更便宜、更可控。
-- 子代理的模型按这个顺序定：调用时传的 `model` → agent 文件里写的 `model` → magpie 的 subagent 档位 → 主会话模型。subagent 档位没设时（看个人配置），不写 model 的子代理（`general-purpose`、不带角色的工作流子代理）会直接用主会话的 Opus，所以能用具名角色就用具名角色。
-- `general-purpose` 不得已要用时传 `model="sonnet"` 或 `model="fable"`；具体落点以在用组合为准。别名档位从大到小是 fable、opus、sonnet、haiku，各自用途见组合文件注释。Opus 主会话里不要传 `model="opus"`：同家族时 Claude Code 直接用主会话的 Opus，不走档位（11-03 实测）。
+- Claude Code 下调用具名 agent **不传 `model`**，让 frontmatter 生效；只有生效配置给该角色写了别名才传。Codex 下照生效配置传 `model` 和 `reasoning_effort`，没写的那项不传（`参考/宿主差异.md`）。
+- Codex 下只读角色没有工具隔离：派只读子代理前后各跑一次 `git status --short`，多出改动就停下报告用户。
+- Claude Code 下**不用内置 Explore / Plan**：它们的模型由 Claude Code 按环境决定，可能落到 Opus，也不受 agent 文件控制；具名 explorer 更便宜、更可控。
+- Claude Code 下子代理的模型按这个顺序定（Codex 相反，角色文件里写了的最后生效，见 `参考/宿主差异.md`）：调用时传的 `model` → agent 文件里写的 `model` → magpie 的 subagent 档位 → 主会话模型。subagent 档位没设时（看个人配置），不写 model 的子代理（`general-purpose`、不带角色的工作流子代理）会直接用主会话的 Opus，所以能用具名角色就用具名角色。
+- Claude Code 下 `general-purpose` 不得已要用时传 `model="sonnet"` 或 `model="fable"`；具体落点以在用组合为准。别名档位从大到小是 fable、opus、sonnet、haiku，各自用途见组合文件注释。Opus 主会话里不要传 `model="opus"`：同家族时 Claude Code 直接用主会话的 Opus，不走档位（11-03 实测）。
 - worker 的 `--model` 写角色组名（`group/impl` 这类），不写 `codex/<模型名>` 这种直接模型名：直接写会绕过组内兜底和档位设置，落点检查也认不出是哪个角色。`--agent codex` 的裸模型名是另一回事，见第 1 节。
 - 便宜模型不知道时容易编：只给它派结果能校验的活（有原文可对照、有路径可核），不派“判断外面有没有这条信息”的活。哪些模型属于这类见个人配置。
 
@@ -112,5 +115,6 @@ Orca worker（要改代码、耗时长、要并行、要别的 agent；怎么起
 | 跑全量、全量提速、界面验收、浏览器分工 | `参考/验收与测试.md` | 基础层 |
 | 切组合、核对落点、档位组和别名、每分钟请求上限、magpie 智能路由 | `参考/组合与路由.md` | 底座层 |
 | 配合 mattpocock 技能（code-review、implement-spec、/implement 等） | `参考/配合其他技能.md` | 基础层 |
+| 主会话是 Codex，或个人配置里写了 `config.toml` | `参考/宿主差异.md` | 基础层 |
 
-本地脚本在 `脚本/` 下，跑起来不花 token：每天第一次派活前跑 `python ~/.claude/skills/dispatch/脚本/体检.py`；落点检查、WSL 衔接、全量排队的用法见对应参考篇。预算见个人配置，按 `magpie usage` 核对。
+本地脚本在 `脚本/` 下，跑起来不花 token：每天第一次派活前跑 `python <本技能目录>/脚本/体检.py`（本技能目录：Claude Code 下是 `~/.claude/skills/dispatch`，Codex 下是 `~/.agents/skills/dispatch`）；落点检查、WSL 衔接、全量排队的用法见对应参考篇。预算见个人配置，按 `magpie usage` 核对。
