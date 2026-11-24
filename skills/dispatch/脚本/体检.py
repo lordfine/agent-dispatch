@@ -32,7 +32,7 @@ def compare_combination(expected_groups: dict[str, list[str]], actual_groups: di
     for alias, expected in expected_claude.items():
         actual = actual_claude.get(alias)
         if actual != expected:
-            differences.append({"message": f"档位 {alias} 不一致：期望 {expected}；实际 {actual or '缺失'}"})
+            differences.append({"message": f"档位 {alias} 不一致：期望 {expected}；实际 {actual or '未单独设置（跟随主模型）'}"})
     for alias, expected in (expected_effort or {}).items():
         actual = (actual_effort or {}).get(alias)
         if actual != expected:
@@ -56,7 +56,8 @@ def check_combination(timeout: float) -> tuple[bool, str]:
         raise TimeoutError("组合一致检查超时")
     output = run_command(["magpie", "claude"], remaining)
     aliases = parse_magpie_claude_output(output)
-    if not groups or not aliases:
+    # 别名都没单独设置时 magpie claude 只打印主模型一行，这是合法状态（2026-11-24 实测），交给比对报“未单独设置”，不当解析失败。
+    if not groups or "Claude Code" not in output:
         raise ValueError("无法解析 magpie 的组或档位输出，需确认 CLI 输出格式")
     differences = compare_combination(combination["member_specs"], groups, combination["claude"], aliases, combination["claude_effort"], parse_magpie_claude_effort_output(output))
     return (False, "；".join(item["message"] for item in differences)) if differences else (True, "当前组合成员、顺序、档位和推理档一致")

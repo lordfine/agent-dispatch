@@ -41,6 +41,17 @@ class 体检组合一致测试(unittest.TestCase):
     def test_组或档位缺失均报告(self):
         self.assertEqual(len(compare_combination({"a": ["p/m"]}, {}, {"opus": "group/a"}, {})), 2)
 
+    def test_别名都未单独设置时报不一致而非解析失败(self):
+        from 体检 import check_combination
+        输出 = {"groups": "  审查  group/review  order · stays turn  p/主:xhigh → p/备:xhigh\n",
+              "claude": "  Claude Code  来源乙/deepseek-flash  ·  effort medium  ·  permission mode bypassPermissions  ~\\.claude\\settings.json\n"}
+        组合 = {"member_specs": {"review": ["p/主:xhigh", "p/备:xhigh"]}, "claude": {"opus": "来源乙/glm-5.4"}, "claude_effort": {}}
+        with patch("体检.load_current_combination", return_value=组合), patch("体检.run_command", side_effect=lambda 命令, *_: 输出[命令[1]]):
+            正常, 消息 = check_combination(30)
+        self.assertFalse(正常)
+        self.assertIn("档位 opus 不一致", 消息)
+        self.assertIn("未单独设置", 消息)
+
     def test_所有成员必须解析且不得受ANSI影响(self):
         self.assertEqual(parse_magpie_groups_output("\x1b[32m名字 group/a order 来源/主:high → 来源/备:high\x1b[0m"), {"a": ["来源/主:high", "来源/备:high"]})
 

@@ -1,29 +1,30 @@
 # Codex 组合：Opus 主脑 + Codex 三个模型干活
 # 这是示例组合：先用 magpie providers 查到自己的来源 id，把 <Codex来源>、<国产来源>、<Claude来源> 换掉，复制到个人配置的 组合/ 下再改。
+# 2026-11-18 作者定：额度恢复后不用 fast，不优先 astra，强实现尽量用 sol；verify 也改为 sol 打头、astra 兜底。
 # 每行一条 magpie 命令；# 开头是注释。用 切换组合.py 应用。
 # Codex 额度用完或账号不可用时，routing=order 会自动顺延到第二个成员。
 # 额度紧张时的降级办法：把 Astra 换成 Sol、Sol 换成 Terra，或把 :xhigh 改 :high、:high 改 :medium。
 # stays=turn：每轮新对话都从第一顺位 Codex 重新试，避免一次断网后长会话一直留在兜底模型（2026-11-06 实测 stays=auto 时约七成请求滞留 GLM）。
 magpie group add explore models=<Codex来源>/gpt-6.1-terra:medium,<国产来源>/MiniMax-M3.1-Flash:medium routing=order stays=turn
 magpie group add extract models=<Codex来源>/gpt-6.1-terra:medium,<国产来源>/MiniMax-M3.1-Flash:medium routing=order stays=turn
-magpie group add research models=<Codex来源>/gpt-6.1-sol:high,<Codex来源>/gpt-6-astra:high routing=order stays=turn
-magpie group add review models=<Codex来源>/gpt-6.1-sol:xhigh,<Codex来源>/gpt-6-astra:xhigh routing=order stays=turn
-magpie group add diagnose models=<Codex来源>/gpt-6.1-sol:high,<Codex来源>/gpt-6-astra:high routing=order stays=turn
+# 2026-11-24 作者定：Astra 只留在最需要的一个场景（复核组 verify 兜底），调研、诊断、审查的兜底都换 Terra。
+magpie group add research models=<Codex来源>/gpt-6.1-sol:high,<Codex来源>/gpt-6.1-terra:high routing=order stays=turn
+magpie group add review models=<Codex来源>/gpt-6.1-sol:xhigh,<Codex来源>/gpt-6.1-terra:xhigh routing=order stays=turn
+magpie group add diagnose models=<Codex来源>/gpt-6.1-sol:high,<Codex来源>/gpt-6.1-terra:high routing=order stays=turn
 magpie group add write models=<Codex来源>/gpt-6.1-terra:high,<国产来源>/deepseek-flash:high routing=order stays=turn
-magpie group add verify models=<Codex来源>/gpt-6-astra:high,<Codex来源>/gpt-6.1-sol:xhigh routing=order stays=turn
+magpie group add verify models=<Codex来源>/gpt-6.1-sol:xhigh,<Codex来源>/gpt-6-astra:high routing=order stays=turn
 magpie group add impl-lite models=<Codex来源>/gpt-6.1-terra:medium+high+xhigh,<Codex来源>/gpt-6.1-sol:medium+high+xhigh routing=order stays=turn levels=medium,high,xhigh
 magpie group add impl models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh,<Codex来源>/gpt-6.1-terra:medium+high+xhigh routing=order stays=turn levels=medium,high,xhigh
-magpie group add impl-strong models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh,<Codex来源>/gpt-6-astra:medium+high+xhigh routing=order stays=turn levels=medium,high,xhigh
+magpie group add impl-strong models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh routing=order stays=turn levels=medium,high,xhigh
 # Claude Code 的别名档位按大小排：fable 最大，opus 其次，sonnet 再次，haiku 最小。
 # fable：复杂票、非标准任务、前端设计。opus：普通实现，只在主模型不是 Opus 的会话里生效（Opus 主会话传 opus 会直接用 Opus 本身）。
 # sonnet：确定性的清单活、claude-handoff。subagent：没写 model 的子代理（如 general-purpose）的默认落点。
+# 2026-11-24 作者定：opus 指 GLM-5.4，sonnet 指 DeepSeek Flash，haiku 指 MiniMax，fable 指 impl-strong 组；主会话默认模型 deepseek-flash 由用户自设，组合不管。
+# 四个别名的 effort 现为 default（跟随调用方），11-24 起不再钉 medium。
+# 别名后面必须带值：只写别名不带值是写操作，会把 Claude Code 切出 magpie（11-24 已加 PreToolUse 钩子拦截）。
 magpie claude fable group/impl-strong
-# 2026-11-16 作者定：magpie 默认档位保持现状（四个别名 effort 都是 medium、subagent 不设），组合文件对齐现状；需要更高思考档时用具名角色或手动指定。
-magpie claude fable_effort medium
-magpie claude opus group/impl
-magpie claude opus_effort medium
-magpie claude sonnet group/impl-lite
-magpie claude sonnet_effort medium
+magpie claude opus <国产来源>/glm-5.4
+magpie claude sonnet <国产来源>/deepseek-flash
 # subagent 不设：没写 model 的子代理（如 general-purpose）跟随主会话模型；派活一律用具名角色，避免落到主会话 Opus。
 # magpie claude subagent group/impl-lite
 # magpie claude subagent_effort medium
