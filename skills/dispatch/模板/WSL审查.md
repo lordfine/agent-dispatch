@@ -11,10 +11,10 @@
 
 ## 起 worker 示例
 
-`--worktree` 指向要审的那个工作区的路径。review 组成员钉了 xhigh，传 high 也会按 xhigh 发，因此示例不传 `--effort`。
+`--worktree` 指向要审的那个工作区的路径。review 组在示例 Codex 组合里由调用方定档，不传 `--effort` 只会按保底的 high 跑，所以示例显式传 `--effort xhigh`；只有中档票合起来的集成审查才降到 high。
 
 ```text
-orca orchestration worker-start --on <远程服务器名> --worktree "id:<repoId>::<要审的那个工作区的路径>" --spec-file <说明.md> --task-title "WSL 审查" --agent claude --model group/review
+orca orchestration worker-start --on <远程服务器名> --worktree "id:<repoId>::<要审的那个工作区的路径>" --spec-file <说明.md> --task-title "WSL 审查" --agent claude --model group/review --effort xhigh
 ```
 
 ## 交付

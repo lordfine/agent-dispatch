@@ -14,7 +14,7 @@ import sys
 import time
 from pathlib import Path
 
-from 组合解析 import CommandFailure, Combination, config_root, load_config, load_current_combination, parse_magpie_claude_output, parse_magpie_claude_effort_output, parse_magpie_groups_output, run_cli, run_command, write_state
+from 组合解析 import CommandFailure, Combination, config_root, load_config, load_current_combination, parse_magpie_claude_output, parse_magpie_claude_effort_output, parse_magpie_groups_output, redact_account_lock, run_cli, run_command, write_state
 from 生效配置 import load_effective_config
 
 
@@ -23,16 +23,28 @@ CONFIG_ROOT = config_root(DISPATCH_ROOT)
 STATE_ROOT = CONFIG_ROOT / "状态"
 
 
+def describe_difference(expected: list[str], actual: list[str] | None, missing: str) -> str:
+    """“期望 …；实际 …”：账号锁只显示前四位。遮住后两边显示一样、实际却不同时，注明差在第几个成员的账号锁上。"""
+    expected_display = " → ".join(map(redact_account_lock, expected))
+    if actual is None:
+        return f"期望 {expected_display}；实际 {missing}"
+    actual_display = " → ".join(map(redact_account_lock, actual))
+    hidden = [str(number) for number, (want, got) in enumerate(zip(expected, actual), 1) if want != got and redact_account_lock(want) == redact_account_lock(got)]
+    where = f"第 {'、'.join(hidden)} 个成员的" if len(expected) > 1 else ""
+    note = f"（{where}账号锁不同，只显示前四位）" if hidden else ""
+    return f"期望 {expected_display}；实际 {actual_display}{note}"
+
+
 def compare_combination(expected_groups: dict[str, list[str]], actual_groups: dict[str, list[str]], expected_claude: dict[str, str], actual_claude: dict[str, str], expected_effort: dict[str, str] | None = None, actual_effort: dict[str, str] | None = None) -> list[dict[str, str]]:
     differences: list[dict[str, str]] = []
     for name, expected in expected_groups.items():
         actual = actual_groups.get(name)
         if actual != expected:
-            differences.append({"message": f"组 {name} 成员不一致：期望 {' → '.join(expected)}；实际 {' → '.join(actual) if actual is not None else '缺失'}"})
+            differences.append({"message": f"组 {name} 成员不一致：{describe_difference(expected, actual, '缺失')}"})
     for alias, expected in expected_claude.items():
         actual = actual_claude.get(alias)
         if actual != expected:
-            differences.append({"message": f"档位 {alias} 不一致：期望 {expected}；实际 {actual or '未单独设置（跟随主模型）'}"})
+            differences.append({"message": f"档位 {alias} 不一致：{describe_difference([expected], [actual] if actual else None, '未单独设置（跟随主模型）')}"})
     for alias, expected in (expected_effort or {}).items():
         actual = (actual_effort or {}).get(alias)
         if actual != expected:

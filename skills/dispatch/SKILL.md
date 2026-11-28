@@ -76,9 +76,12 @@ Orca worker（要改代码、耗时长、要并行、要别的 agent；怎么起
 
 确定性的活可降一档推理或改用 impl-lite，允许首次交付后按明确反馈补一轮（two-shot）；前端设计、非标准任务用强模型和高档。验收标准不随档位下降。`xhigh` 必须写明属于上面哪类难活，写不出就降到 `high`；集成、检查、复现默认 `high`。派活回复写明档位和理由。
 
-原生子代理的档位（2026-11-16 实测）：具名角色的档位钉在组合文件的组成员上，调用时传 `effort` 不起作用；走 sonnet、fable 这类别名时，按 magpie 里该别名的 effort 发，调用方传的也会被覆盖。要给子代理更高的档，有两个办法：派档位本来就高的具名角色（reviewer、researcher、diagnoser）；或者用工作流的 `agent()`，把 `model` 直接写成带 levels 的角色组名（`group/impl`、`group/impl-strong`、`group/impl-lite`），再传 `effort`，这样会照传。Agent 工具的 `model` 只认别名，做不到这一点。细节见 `参考/组合与路由.md`。
+原生子代理的档位（2026-11-28、29 实测，依据 magpie 0.1.4940 源码）：一个请求最后按哪档发，从高到低是 成员上钉死的档位 → 组里带 `use-effort` 的规则 → 模型名后缀（`group/review:high` 这类）→ 调用方传的档位；都没有就不带，magpie 不补默认档。角色组分两种，示例 Codex 组合里都有（国产示例的角色都钉了档）：
+- 由调用方定档的组（research、review、diagnose）：Agent 工具调用时传 `effort` 就按传的发（review、diagnose 有“至少 high”的保底规则，传 medium 也按 high 发），不传用角色文件里的默认档，三个角色的默认档都实测生效。默认档和什么时候调：researcher 是 high，只查版本号、核实一条说法用 medium，选型对比和架构调研用 xhigh；reviewer 是 xhigh，中档票合起来的集成审查可以用 high，大档票和安全类不降；diagnoser 是 high，间歇性故障、几个嫌疑点要互相印证时用 xhigh。
+- 钉死的组（explore、extract、write、verify）：传什么都不起作用。要更强的脑子，改派 researcher 或 diagnoser。
+走 sonnet、fable 这类别名时，按 magpie 里该别名的 effort 发，调用方传的也会被覆盖。工作流的 `agent()` 把 `model` 写成带 levels 的角色组名（`group/impl` 等）再传 `effort`，会照传。Agent 工具的 `model` 只认别名，做不到这一点。细节见 `参考/组合与路由.md`。
 
-并发上限、连跑和额度检查见个人配置。并行改代码时，每个 worker 使用独立工作区（仅 git 仓库）。订阅类来源（如 Codex）的每分钟请求上限按账号算、所有组共用，开多了主要在排队，见 `参考/组合与路由.md`。
+并发上限、连跑和额度检查见个人配置。并行改代码时，每个 worker 使用独立工作区（仅 git 仓库）。订阅类来源（如 Codex）的每分钟请求上限按账号算、所有组共用，开多了主要在排队，见 `参考/组合与路由.md`。名额满的那一刻，带国产兜底的组（review、diagnose、impl 也算）会直接改派给兜底，按兜底钉的档位发，要的档位不起作用，也不报错；要审查一定落在主模型上，派之前先确认主模型的每分钟名额有余量。
 
 ## 5. 任务说明（spec）怎么写
 
