@@ -7,6 +7,7 @@
 # impl-lite 在国产组合里和 impl 相同，只为了切组合后规格里写的组名还能用。
 magpie group add explore models=<国产来源>/MiniMax-M3.1-Flash:medium routing=order
 magpie group add extract models=<国产来源>/MiniMax-M3.1-Flash:medium routing=order
+# 调研、审查、诊断在这个组合里钉 high：GLM、DeepSeek 没有 medium 和 xhigh，放开的话 medium 会发成 high、xhigh 会发成 max。想由主脑定档，照 Codex 组合这三组的写法换成三档都接的模型。
 magpie group add research models=<国产来源>/glm-5.3-flash:high routing=order
 magpie group add review models=<国产来源>/glm-5.3-flash:high routing=order
 magpie group add diagnose models=<国产来源>/glm-5.3-flash:high routing=order

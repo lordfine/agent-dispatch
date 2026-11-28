@@ -8,9 +8,13 @@
 magpie group add explore models=<Codex来源>/gpt-6.1-terra:medium,<国产来源>/MiniMax-M3.1-Flash:medium routing=order stays=turn
 magpie group add extract models=<Codex来源>/gpt-6.1-terra:medium,<国产来源>/MiniMax-M3.1-Flash:medium routing=order stays=turn
 # 2026-11-24 作者定：Astra 只留在最需要的一个场景（复核组 verify 兜底），调研、诊断、审查的兜底都换 Terra。
-magpie group add research models=<Codex来源>/gpt-6.1-sol:high,<Codex来源>/gpt-6.1-terra:high routing=order stays=turn
-magpie group add review models=<Codex来源>/gpt-6.1-sol:xhigh,<Codex来源>/gpt-6.1-terra:xhigh routing=order stays=turn
-magpie group add diagnose models=<Codex来源>/gpt-6.1-sol:high,<Codex来源>/gpt-6.1-terra:high routing=order stays=turn
+# 调研、审查、诊断由主脑按任务难度定档，默认档写在角色文件里，审查和诊断各有一条保底规则（要的档位不高于 medium 时按 high 发）。
+# 规则里 use= 写组里成员的模型名，不用抄档位范围；同一个模型在组里出现两次时写成和成员一字不差。改了成员的写法后要看规则还在不在。
+magpie group add research models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh,<Codex来源>/gpt-6.1-terra:high routing=order stays=turn levels=medium,high,xhigh
+magpie group add review models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh,<Codex来源>/gpt-6.1-terra:high routing=order stays=turn levels=medium,high,xhigh
+magpie group rule add review use=<Codex来源>/gpt-6.1-sol use-effort=high when="effort <= medium"
+magpie group add diagnose models=<Codex来源>/gpt-6.1-sol:medium+high+xhigh,<Codex来源>/gpt-6.1-terra:high routing=order stays=turn levels=medium,high,xhigh
+magpie group rule add diagnose use=<Codex来源>/gpt-6.1-sol use-effort=high when="effort <= medium"
 magpie group add write models=<Codex来源>/gpt-6.1-terra:high,<国产来源>/deepseek-flash:high routing=order stays=turn
 magpie group add verify models=<Codex来源>/gpt-6.1-sol:xhigh,<Codex来源>/gpt-6-astra:high routing=order stays=turn
 magpie group add impl-lite models=<Codex来源>/gpt-6.1-terra:medium+high+xhigh,<Codex来源>/gpt-6.1-sol:medium+high+xhigh routing=order stays=turn levels=medium,high,xhigh

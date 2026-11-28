@@ -38,6 +38,45 @@ class 体检组合一致测试(unittest.TestCase):
                 差异 = compare_combination({"a": ["p/主:high:fast", "p/备:high"]}, {"a": 实际}, {}, {})
                 self.assertTrue(any("a" in 项["message"] for 项 in 差异))
 
+    def test_体检保留账号差异且只显示锁前四位(self):
+        from 体检 import check_combination
+        with tempfile.TemporaryDirectory() as 临时:
+            根 = Path(临时)
+            目录 = 根 / "组合"
+            目录.mkdir()
+            _ = (目录 / "当前组合.txt").write_text("示例\n", encoding="utf-8")
+            _ = (目录 / "示例.txt").write_text("\n".join([
+                "magpie model disable 来源乙/*",
+                "magpie group add 示例池 models=来源/模型:medium+high+xhigh#demo-expected levels=medium,high,xhigh",
+                "magpie group add review models=group/示例池,来源/兜底:high",
+                'magpie group rule add review use=group/示例池 use-effort=high when="effort <= medium"',
+            ]), encoding="utf-8")
+            组输出 = "group/示例池 order 来源/模型:medium+high+xhigh#demo-actual\ngroup/review order group/示例池 → 来源/兜底:high"
+            with patch.dict("os.environ", {"DISPATCH_CONFIG_DIR": str(根)}), patch("体检.run_command", side_effect=[组输出, "Claude Code 来源/主会话"]):
+                正常, 消息 = check_combination(30)
+        self.assertFalse(正常)
+        self.assertEqual(消息, "组 示例池 成员不一致：期望 来源/模型:medium+high+xhigh#demo…；实际 来源/模型:medium+high+xhigh#demo…（账号锁不同，只显示前四位）")
+        self.assertNotIn("-expected", 消息)
+        self.assertNotIn("-actual", 消息)
+
+    def test_同前缀账号锁两边显示一样时注明差在账号锁上(self):
+        for 期望组, 实际组, 期望档位, 实际档位, 说明 in (
+            ({"a": ["p/主#demo-one"]}, {"a": ["p/主#demo-two"]}, {}, {}, "组 a 成员不一致：期望 p/主#demo…；实际 p/主#demo…（账号锁不同，只显示前四位）"),
+            ({"a": ["p/主#demo-one", "p/备:high"]}, {"a": ["p/主#demo-two", "p/备:medium"]}, {}, {}, "组 a 成员不一致：期望 p/主#demo… → p/备:high；实际 p/主#demo… → p/备:medium（第 1 个成员的账号锁不同，只显示前四位）"),
+            ({}, {}, {"opus": "p/主#demo-one"}, {"opus": "p/主#demo-two"}, "档位 opus 不一致：期望 p/主#demo…；实际 p/主#demo…（账号锁不同，只显示前四位）"),
+        ):
+            with self.subTest(说明=说明):
+                差异 = compare_combination(期望组, 实际组, 期望档位, 实际档位)
+                self.assertEqual([项["message"] for 项 in 差异], [说明])
+                self.assertNotIn("-one", 差异[0]["message"])
+                self.assertNotIn("-two", 差异[0]["message"])
+
+    def test_看得出的差异不多提账号锁(self):
+        差异 = compare_combination({"a": ["p/主:high", "p/备#demo-one"]}, {"a": ["p/主:medium", "p/备#demo-one"]}, {}, {})
+        self.assertEqual(差异[0]["message"], "组 a 成员不一致：期望 p/主:high → p/备#demo…；实际 p/主:medium → p/备#demo…")
+        缺失 = compare_combination({"a": ["p/主#demo-one"]}, {}, {}, {})
+        self.assertEqual(缺失[0]["message"], "组 a 成员不一致：期望 p/主#demo…；实际 缺失")
+
     def test_组或档位缺失均报告(self):
         self.assertEqual(len(compare_combination({"a": ["p/m"]}, {}, {"opus": "group/a"}, {})), 2)
 
